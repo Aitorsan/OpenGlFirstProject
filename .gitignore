@@ -6,11 +6,19 @@
 *.user
 *.userosscache
 *.sln.docstates
+ OpenGLtextures/
+ OpenGl_Lighting/
  OpenGlFirstProject/*.vcxproj
  OpenGlFirstProject/*.vcxproj.*
  OpenGlFirstProject/*.user
  OpenGlFirstProject/*.filters
- bin/
+ OpenGl_Lighting/*.filters
+ OpenGl_Lighting/*.vcxproj
+ OpenGl_Lighting/*.vcxproj.*
+ OpenGLtextures/*.vcxproj.*
+ OpenGLtextures/*.user
+ OpenGLtextures/*.filters
+ OpenGLtextures/*.vcxproj
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 

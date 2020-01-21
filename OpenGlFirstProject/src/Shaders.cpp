@@ -1,32 +1,33 @@
-#include "headers/Shaders.h"
-#include "headers/Diagnostics.h"
+#include "include/Shaders.h"
+#include "include/Diagnostics.h"
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <GL/glew.h>
+#include <../third-party/include/GL/glew.h>
 
 unsigned int CreateShaderProgram(const char * vertexShaderSourcePath, const char * fragmentShaderSourcePath)
 {
-	Shaders shaders { GetShadersID(vertexShaderSourcePath, fragmentShaderSourcePath) };
+	auto[VertexID, FragmentID] = GetShadersID(vertexShaderSourcePath, fragmentShaderSourcePath) ;
 	unsigned int ShaderProgram = glCreateProgram();
 	
-	glAttachShader(ShaderProgram, shaders.VertexID);
-	glAttachShader(ShaderProgram, shaders.FragmentID);
+	glAttachShader(ShaderProgram, VertexID);
+	glAttachShader(ShaderProgram, FragmentID);
 	
 	glLinkProgram(ShaderProgram);
 	
-	glDetachShader(ShaderProgram, shaders.VertexID);
-	glDetachShader(ShaderProgram, shaders.FragmentID);
+	glDetachShader(ShaderProgram, VertexID);
+	glDetachShader(ShaderProgram, FragmentID);
 	
-	glDeleteShader(shaders.VertexID);
-	glDeleteShader(shaders.FragmentID);
+	glDeleteShader(VertexID);
+	glDeleteShader(FragmentID);
 	
 	return ShaderProgram;
 }
 
-Shaders GetShadersID(const char * vetexShaderSourcePath, const char * fragmentShaderSourcePath)
+std::tuple<unsigned int , unsigned int > GetShadersID(const char * vetexShaderSourcePath, const char * fragmentShaderSourcePath)
 {
-	Shaders shaderIds { 0,0 };
+	unsigned int VertexID{ };
+	unsigned int FragmentID{ };
 	std::ifstream vertexShaderFile(vetexShaderSourcePath);
 	std::ifstream fragmentShaderFile(fragmentShaderSourcePath);
 
@@ -41,18 +42,18 @@ Shaders GetShadersID(const char * vetexShaderSourcePath, const char * fragmentSh
 		const char* vertexSourceCode = vsc.c_str();
 		const char* fragmentSourceCode = fsc.c_str();
 		
-		shaderIds.VertexID = glCreateShader(GL_VERTEX_SHADER);
-		shaderIds.FragmentID = glCreateShader(GL_FRAGMENT_SHADER);
+		VertexID = glCreateShader(GL_VERTEX_SHADER);
+		FragmentID = glCreateShader(GL_FRAGMENT_SHADER);
 
-		glShaderSource(shaderIds.VertexID, 1, &vertexSourceCode, nullptr);
-		glShaderSource(shaderIds.FragmentID, 1, &fragmentSourceCode, nullptr);
+		glShaderSource(VertexID, 1, &vertexSourceCode, nullptr);
+		glShaderSource(FragmentID, 1, &fragmentSourceCode, nullptr);
 		
-		glCompileShader(shaderIds.VertexID);
-		DebugShaderCompileStatus(shaderIds.VertexID, "vertex");
+		glCompileShader(VertexID);
+		DebugShaderCompileStatus(VertexID, "vertex");
 		
-		glCompileShader(shaderIds.FragmentID);
-		DebugShaderCompileStatus(shaderIds.FragmentID, "fragment");   
+		glCompileShader(FragmentID);
+		DebugShaderCompileStatus(FragmentID, "fragment");   
 	}
-	return shaderIds;
+	return { VertexID,FragmentID };
 }
 
