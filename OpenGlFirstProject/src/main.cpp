@@ -1,10 +1,10 @@
-#include <../third-party/include/GL/glew.h>
-#include <../third-party/include/GLFW/glfw3.h>
-#include <../third-party/include/glm/glm.hpp>
-#include <../third-party/include/glm/gtc/matrix_transform.hpp>
-#include <../third-party/include/sphere/Sphere.h>
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "shapes/Sphere.h"
 #define STB_IMAGE_IMPLEMENTATION
-#include <../third-party/include/stb_image.h>
+#include <stb_image.h>
 #include <iostream>
 #include <thread>
 #include <future>
@@ -12,134 +12,38 @@
 #include "include/Shaders.h"
 #include "include/Maths.hpp"
 #include "include/main.h"
+#include "include/Cubes.h"
+#include "include/camera.h"
 
-//evil globals lol
- int SCR_WIDTH = 800;
- int SCR_HEIGHT = 600;
-
-//camera data 
-float cameraX = 0.0f,cameraY = 0.0f, cameraZ = 2.f;
-glm::vec3 cameraFront{ 0,0,-1.0f };
-glm::vec3 camerapos(cameraX, cameraY, cameraZ);
-glm::vec3 cameraUp(0, 1, 0);
-
-bool firstMouse = true;
-float yaw = -90.0f;	// yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing to the right so we initially rotate a bit to the left.
-float pitch = 0.0f;
-float lastX = SCR_WIDTH /2.0f;
-float lastY = SCR_HEIGHT /2.0f ;
 constexpr float fov = 45.0f;
-
 //thread stuff
 std::mutex mut;
 
-//light color
-glm::vec3 lightColor(1.9f,1.9f,1.9f);
-glm::vec3 lightPosition(0.0f,0.0f,-0.5f);
 
 //projeciton matrix can be precomputed 
  glm::mat4 projectionMatrix = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)(SCR_HEIGHT), 0.5f, 10000.f);
 
+Camera camera;
 ////////////////// MAIN ////////////////////////////////////////////////////////////////////////
 int main()
 {   
 	GLFWwindow* window = CreateGLFWwindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL Aitor");
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-	glEnable(GL_DEPTH_TEST);
 
-	float skyBoxVertices[] 
-	{
-		// positions          
-		-1.0f,  1.0f, -1.0f,
-		-1.0f, -1.0f, -1.0f,
-		 1.0f, -1.0f, -1.0f,
-		 1.0f, -1.0f, -1.0f,
-		 1.0f,  1.0f, -1.0f,
-		-1.0f,  1.0f, -1.0f,
-
-		-1.0f, -1.0f,  1.0f,
-		-1.0f, -1.0f, -1.0f,
-		-1.0f,  1.0f, -1.0f,
-		-1.0f,  1.0f, -1.0f,
-		-1.0f,  1.0f,  1.0f,
-		-1.0f, -1.0f,  1.0f,
-
-		 1.0f, -1.0f, -1.0f,
-		 1.0f, -1.0f,  1.0f,
-		 1.0f,  1.0f,  1.0f,
-		 1.0f,  1.0f,  1.0f,
-		 1.0f,  1.0f, -1.0f,
-		 1.0f, -1.0f, -1.0f,
-
-		-1.0f, -1.0f,  1.0f,
-		-1.0f,  1.0f,  1.0f,
-		 1.0f,  1.0f,  1.0f,
-		 1.0f,  1.0f,  1.0f,
-		 1.0f, -1.0f,  1.0f,
-		-1.0f, -1.0f,  1.0f,
-
-		-1.0f,  1.0f, -1.0f,
-		 1.0f,  1.0f, -1.0f,
-		 1.0f,  1.0f,  1.0f,
-		 1.0f,  1.0f,  1.0f,
-		-1.0f,  1.0f,  1.0f,
-		-1.0f,  1.0f, -1.0f,
-
-		-1.0f, -1.0f, -1.0f,
-		-1.0f, -1.0f,  1.0f,
-		 1.0f, -1.0f, -1.0f,
-		 1.0f, -1.0f, -1.0f,
-		-1.0f, -1.0f,  1.0f,
-		 1.0f, -1.0f,  1.0f
-	};
-	//cubes
-	float vertices[] = {
-	   -0.5f, -0.5f, -0.5f,	   0.0f, 0.0f, -1.0f,		0.0f, 0.0f,
-		0.5f, -0.5f, -0.5f,	   0.0f, 0.0f, -1.0f,		1.0f, 0.0f,
-		0.5f,  0.5f, -0.5f,	   0.0f, 0.0f, -1.0f,		1.0f, 1.0f,
-		0.5f,  0.5f, -0.5f,    0.0f, 0.0f, -1.0f, 	    1.0f, 1.0f,
-	   -0.5f,  0.5f, -0.5f,	   0.0f, 0.0f, -1.0f,	    0.0f, 1.0f,
-	   -0.5f, -0.5f, -0.5f,    0.0f, 0.0f, -1.0f,	    0.0f, 0.0f,
-
-	   -0.5f, -0.5f,  0.5f,		0.0f,  0.0f, 1.0f,	    0.0f, 0.0f,
-		0.5f, -0.5f,  0.5f,		0.0f,  0.0f, 1.0f,	    1.0f, 0.0f,
-		0.5f,  0.5f,  0.5f,		0.0f,  0.0f, 1.0f,	    1.0f, 1.0f,
-		0.5f,  0.5f,  0.5f,		0.0f,  0.0f, 1.0f,	    1.0f, 1.0f,
-	   -0.5f,  0.5f,  0.5f,		0.0f,  0.0f, 1.0f,	    0.0f, 1.0f,
-	   -0.5f, -0.5f,  0.5f,		0.0f,  0.0f, 1.0f,	    0.0f, 0.0f,
-
-	   -0.5f,  0.5f,  0.5f,	   -1.0f,  0.0f,  0.0f,		1.0f, 0.0f,
-	   -0.5f,  0.5f, -0.5f,	   -1.0f,  0.0f,  0.0f,		1.0f, 1.0f,
-	   -0.5f, -0.5f, -0.5f,	   -1.0f,  0.0f,  0.0f,		0.0f, 1.0f,
-	   -0.5f, -0.5f, -0.5f,	   -1.0f,  0.0f,  0.0f,		0.0f, 1.0f,
-	   -0.5f, -0.5f,  0.5f,	   -1.0f,  0.0f,  0.0f,		0.0f, 0.0f,
-	   -0.5f,  0.5f,  0.5f,	   -1.0f,  0.0f,  0.0f,	    1.0f, 0.0f,
-
-		0.5f,  0.5f,  0.5f,		1.0f,  0.0f,  0.0f,		1.0f, 0.0f,
-		0.5f,  0.5f, -0.5f,		1.0f,  0.0f,  0.0f,		1.0f, 1.0f,
-		0.5f, -0.5f, -0.5f,		1.0f,  0.0f,  0.0f,		0.0f, 1.0f,
-		0.5f, -0.5f, -0.5f,		1.0f,  0.0f,  0.0f,		0.0f, 1.0f,
-		0.5f, -0.5f,  0.5f,		1.0f,  0.0f,  0.0f,		0.0f, 0.0f,
-		0.5f,  0.5f,  0.5f,		1.0f,  0.0f,  0.0f,		1.0f, 0.0f,
-
-	   -0.5f, -0.5f, -0.5f,		0.0f, -1.0f,  0.0f,		0.0f, 1.0f,
-		0.5f, -0.5f, -0.5f,		0.0f, -1.0f,  0.0f,		1.0f, 1.0f,
-		0.5f, -0.5f,  0.5f,		0.0f, -1.0f,  0.0f,		1.0f, 0.0f,
-		0.5f, -0.5f,  0.5f,		0.0f, -1.0f,  0.0f,		1.0f, 0.0f,
-	   -0.5f, -0.5f,  0.5f,	    0.0f, -1.0f,  0.0f,		0.0f, 0.0f,
-	   -0.5f, -0.5f, -0.5f,		0.0f, -1.0f,  0.0f,		0.0f, 1.0f,
-
-	   -0.5f,  0.5f, -0.5f,	    0.0f,  1.0f,  0.0f,		0.0f, 1.0f,
-		0.5f,  0.5f, -0.5f,	    0.0f,  1.0f,  0.0f,		1.0f, 1.0f,
-		0.5f,  0.5f,  0.5f,		0.0f,  1.0f,  0.0f,		1.0f, 0.0f,
-		0.5f,  0.5f,  0.5f,		0.0f,  1.0f,  0.0f,		1.0f, 0.0f,
-	   -0.5f,  0.5f,  0.5f,		0.0f,  1.0f,  0.0f,		0.0f, 0.0f,
-	   -0.5f,  0.5f, -0.5f,		0.0f,  1.0f,  0.0f,     0.0f, 1.0f
-	};
-	
+	//sky box
+	float skyBoxVertices[108]{};
+	genSkyBoxCube(skyBoxVertices);
+	//Cube shape
+	constexpr int cubeSize = 192, indSize = 36;
+	float cube[cubeSize]{};
+	unsigned int cubeIndices[indSize]{};
+	genCubeWithTextureCoordsAndIndices(cube,cubeIndices);
 	//light is a sphere written by a third party
 	Sphere lightSphere;
 	
+	//light position
+	glm::vec3 lightPosition(0.0f,0.0f,-0.5f);
+	//light color
+	glm::vec3 lightColor(1.9f, 1.9f, 1.9f);
 
 	/*************************************
 	* Shader programs
@@ -147,15 +51,13 @@ int main()
 	GLuint shaderProgram = CreateShaderProgram("shaders/vertex.shader", "shaders/fragment.shader");
 	GLuint lightShaderProgram = CreateShaderProgram("shaders/lightVertex.shader","shaders/lightFragment.shader");
 	GLuint skyBoxShaderProgram = CreateShaderProgram("shaders/skyBoxVertex.shader", "shaders/skyBoxFragment.shader");
-
 	/*************************************
 	* Light buffer objects
 	**************************************/
 	GLuint lightVAO, lightVBO;
 	glGenVertexArrays(1, &lightVAO);
-	glBindVertexArray(lightVAO);
-
 	glGenBuffers(1, &lightVBO);
+	glBindVertexArray(lightVAO);
 	glBindBuffer(GL_ARRAY_BUFFER, lightVBO);
 	glBufferData(GL_ARRAY_BUFFER, lightSphere.getVertexSize(), lightSphere.vertices.data(), GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
@@ -176,32 +78,34 @@ int main()
 
 	std::vector<std::string> boxFaces
 	{
-		"textures/lightBlueSpace/right.png",
-		"textures/lightBlueSpace/left.png",
-		"textures/lightBlueSpace/top.png",
-		"textures/lightBlueSpace/bot.png",
-		"textures/lightBlueSpace/front.png",
-		"textures/lightBlueSpace/back.png"
+		"textures/redSpace/bkg2_right1.png",
+		"textures/redSpace/bkg2_left2.png",
+		"textures/redSpace/bkg2_top3.png",
+		"textures/redSpace/bkg2_bottom4.png",
+		"textures/redSpace/bkg2_front5.png",
+		"textures/redSpace/bkg2_back6.png"
 	};
 
 	GLuint skyBoxTexture = GetSkyBoxTexture(boxFaces);
-	
+
 	/*************************************
 	* Cubes buffer objects
 	**************************************/
-	unsigned int VAO, VBO;
+	unsigned int VAO, VBO,EBO;
 	//Vertex array object
 	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
-	
 	//Vertex buffer object
 	glGenBuffers(1, &VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(cube), cube, GL_DYNAMIC_DRAW);
+	//Element array buffer
+	glGenBuffers(1, &EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndices), cubeIndices, GL_DYNAMIC_DRAW);
 	//position data layout
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8* sizeof(float), 0);
-	
 	//normals
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8* sizeof(float), (void*)(3*sizeof(float)));
@@ -236,72 +140,61 @@ int main()
 	glVertexAttribDivisor(4, 1);
 	glVertexAttribDivisor(5, 1);
 	glVertexAttribDivisor(6, 1);
-	
-	std::thread loop_thread{ &ChangeTranslations, amount, std::ref(model_array) };
-	loop_thread.detach();
-	
-	glDisable(GL_CULL_FACE);
 	//Texture for the cubes
 	GLuint texture = GetTexture("textures/rock.jpg");
 
-	float last = glfwGetTime();
-	
-	int colorFactor = 0;
+	std::thread loop_thread{ &ChangeTranslations, amount, std::ref(model_array) };
+	loop_thread.detach();
+
+	float last{0};
+	float velocity = 10.f;
+
 	while (!glfwWindowShouldClose(window))
 	{   
 		float current = glfwGetTime();
 		float elapsed = current - last;
 		last = current;
-		processInput(elapsed,window);
-
+		
+		processInput(window,camera,elapsed,velocity);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		
 		//Draw skybox
 		glUseProgram(skyBoxShaderProgram);
-		Transforms(skyBoxShaderProgram, true);
-		mat4 skyModel(1.0f);
-		GLuint skyModelLoc = glGetUniformLocation(skyBoxShaderProgram, "model");
-		glUniformMatrix4fv(skyModelLoc, 1, GL_FALSE, &skyModel[0][0]);
+		Transforms(skyBoxShaderProgram,camera, true);
+		glm::mat4 skyModel(1.0f);
+		glUniformMatrix4fv(glGetUniformLocation(skyBoxShaderProgram, "model"), 1, GL_FALSE, &skyModel[0][0]);
 		glBindVertexArray(skyBoxVAO);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, skyBoxTexture);
-		glEnable(GL_CULL_FACE);
-		glFrontFace(GL_CCW);
 		glDisable(GL_DEPTH_TEST);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 		glEnable(GL_DEPTH_TEST);
-		glDisable(GL_CULL_FACE);
 
 		// draw light source
 		glUseProgram(lightShaderProgram);
-		GLuint locationlightColor = glGetUniformLocation(lightShaderProgram, "ligthColor");
-		glUniform3fv(locationlightColor, 1, &lightColor[0]);
-		Transforms(lightShaderProgram,false);
-		mat4 model(1.0f);
-		model = glm::scale(model, vec3(9, 9, 9.0f));
+		glUniform3fv(glGetUniformLocation(lightShaderProgram, "ligthColor"), 1, &lightColor[0]);
+		Transforms(lightShaderProgram,camera,false);
+		glm::mat4 model(1.0f);
+		model = glm::scale(model, glm::vec3(9, 9, 9.0f));
 		model = glm::translate(model, lightPosition);
-		GLuint modelLocation = glGetUniformLocation(lightShaderProgram, "model");
-		glUniformMatrix4fv(modelLocation, 1, GL_FALSE, &model[0][0]);
-		GLuint lightColorLocation = glGetUniformLocation(lightShaderProgram, "lightColor");
-		glUniform3fv(lightColorLocation, 1, &lightColor[0]);
+		glUniformMatrix4fv(glGetUniformLocation(lightShaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
+		glUniform3fv(glGetUniformLocation(lightShaderProgram, "lightColor"), 1, &lightColor[0]);
 		glBindVertexArray(lightVAO);
 		lightSphere.draw();
 
 		//draw cubes
 		glUseProgram(shaderProgram);
-		Transforms(shaderProgram, false);
-		GLuint camerPosLocation = glGetUniformLocation(shaderProgram, "viewPos");
-		glUniform3fv(shaderProgram, 1, &camerapos[0]);
-		GLuint lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
-		glUniform3fv(lightColorLoc, 1, &lightColor[0]);
-		GLuint lightPosLocation = glGetUniformLocation(shaderProgram, "lightPos");
-		glUniform3fv(lightPosLocation, 1, &lightPosition[0]);
+		Transforms(shaderProgram, camera,false);
+		glUniform3fv(glGetUniformLocation(shaderProgram, "viewPos"), 1, &camera.GetCameraPosition()[0]);
+		glUniform3fv(glGetUniformLocation(shaderProgram, "lightColor") , 1, &lightColor[0]);
+		glUniform3fv(glGetUniformLocation(shaderProgram, "lightPos"), 1, &lightPosition[0]);
 		glBindVertexArray(VAO);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texture);
 		mut.lock();
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::mat4)*model_array.size(), &model_array[0]);
 		std::size_t currsize = model_array.size();
-		glDrawArraysInstanced(GL_TRIANGLES, 0, 36, currsize);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::mat4)*currsize, &model_array[0]);
+		glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, currsize);
 		mut.unlock();
 
 		glfwSwapBuffers(window);
@@ -316,20 +209,13 @@ int main()
 	return 0;
 }
 
-void Transforms(GLuint shaderProgram,bool skybox = false)
+void Transforms(GLuint shaderProgram, Camera& camera , bool skybox = false)
 {
-	static bool once = true;
-	glm::mat4 cameraTranslation;
-	if(!skybox)
-		cameraTranslation = glm::lookAt(camerapos ,camerapos + cameraFront, glm::vec3(0.0, 1.0, 0.0));
-	else
-		cameraTranslation = mat4(mat3(glm::lookAt(camerapos, camerapos + cameraFront, glm::vec3(0.0, 1.0, 0.0))));
-	PRINT
-	GLint cameraTrans = glGetUniformLocation(shaderProgram, "camera");
-	glUniformMatrix4fv(cameraTrans, 1, GL_FALSE, &cameraTranslation[0][0]);
-
-	GLint projectionLocation = glGetUniformLocation(shaderProgram, "project");
-	glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
+	glm::mat4 cameraTranslation = camera.GetCameraTranslationMatrix();
+	if(skybox)
+		cameraTranslation = glm::mat4(glm::mat3(cameraTranslation));
+	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "camera"), 1, GL_FALSE, &cameraTranslation[0][0]);
+	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "project"), 1, GL_FALSE, &projectionMatrix[0][0]);
 }
 
 
@@ -340,47 +226,12 @@ void ChangeTranslations(unsigned int amount ,std::vector<glm::mat4>& model_array
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::scale(model, glm::vec3(2.0f, 2.0f, 2.0f));
 		model = glm::rotate(model, glm::radians(float(i)), glm::vec3(1.0f, 0.3f, 0.5f));
-		model = glm::translate(model, glm::vec3(cos(glfwGetTime()*i)*200,sin(glfwGetTime())*10,tanf(glfwGetTime()*i)));
+		model = glm::translate(model, glm::vec3(sin(203.0f*i/800)*403,cos(301.0f*i/400)*401,sin(400.0f*i/600)*405));
 		mut.lock();
 		model_array.push_back( model);
 		mut.unlock();	
 	} 
 }
-
-void mouse_callback(GLFWwindow * window, double xpos, double ypos)
-{
-	static bool fistMouse = true;
-	if (firstMouse) // initially set to true
-	{
-		lastX = xpos;
-		lastY = ypos;
-		firstMouse = false;
-	}
-	float xoffset = xpos - lastX;
-	float yoffset = lastY - ypos;
-	lastX = xpos;
-	lastY = ypos;
-
-	float sensitivity = 0.1f;
-	xoffset *= sensitivity;
-	yoffset *= sensitivity;
-
-	yaw += xoffset;
-	pitch += yoffset;
-	
-	if (pitch > 89.0f)
-		pitch = 89.0f;
-	if (pitch < -89.0f)
-		pitch = -89.0f; 
-	
-	glm::vec3 direction;
-	direction.x = cos(glm::radians(yaw))* cos(glm::radians(pitch));
-	direction.y = sin(glm::radians(pitch));
-	direction.z = sin(glm::radians(yaw))* cos(glm::radians(pitch));
-	
-	cameraFront = glm::normalize(direction);
-}
-
 
 GLuint GetSkyBoxTexture(std::vector<std::string>& faces)
 {
@@ -411,7 +262,6 @@ GLuint GetTexture(const char* texturePath)
 	int width, height, nrChannels;
 	//stbi_set_flip_vertically_on_load(true);
 	unsigned char* data = stbi_load(texturePath, &width, &height, &nrChannels, 0);
-
 	// generate a texture
 	unsigned int texture;
 	glGenTextures(1, &texture);
@@ -428,41 +278,56 @@ GLuint GetTexture(const char* texturePath)
 	return texture;
 }
 
-void processInput(float elapsed_time,GLFWwindow* window)
+void processInput(GLFWwindow* window,Camera& camera ,float elapsedTime,float velocity)
 {
-    float velocity = 10.f;
+	camera.CheckMouseMovement(*window);
 	
 	if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
 	{
-		velocity += 300.f;
+		velocity += 10.5f;
 	}
+	else if (velocity > 20.f)
+	{
+		velocity -= 0.2f;
+	}
+	
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) 
 	{
 		glfwSetWindowShouldClose(window, true); 
 	}
-
+	
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 	{
-		camerapos  += cameraFront*velocity*elapsed_time;
+		camera.MoveFront(elapsedTime, velocity);
 	}
+
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
 	{
-		camerapos -=  cameraFront* velocity*elapsed_time;
+		camera.MoveBack(elapsedTime, velocity);
 	}
+	
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 	{
-		camerapos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * elapsed_time*velocity;
+		camera.MoveLeft(elapsedTime, velocity);
 	}
+
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 	{
-
-		camerapos += glm::normalize(glm::cross(cameraFront, cameraUp)) * elapsed_time*velocity;
+		camera.MoveRight(elapsedTime, velocity);
 	}
-	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+	
+	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
 	{
-		camerapos.y += 1.5f* elapsed_time;
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	}
+	
+	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE)
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
+	
 }
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	// make sure the viewport matches the new window dimensions; note that width and 

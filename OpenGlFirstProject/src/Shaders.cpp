@@ -3,7 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <../third-party/include/GL/glew.h>
+#include <GL/glew.h>
 
 unsigned int CreateShaderProgram(const char * vertexShaderSourcePath, const char * fragmentShaderSourcePath)
 {

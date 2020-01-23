@@ -11,7 +11,7 @@ uniform vec3 viewPos;
 void main()
 {   
 	//ambient 
-	float ambientStrength = 0.2f;
+	float ambientStrength = 0.1f;
 	vec3 ambient = ambientStrength * lightColor;
 
 	//diffuse

@@ -1,5 +1,5 @@
 #include "include/Diagnostics.h"
-#include <../third-party/include/GL/glew.h>
+#include <GL/glew.h>
 #include <iostream>
 
 void DebugProgramLinkError(unsigned int shaderProgramId)

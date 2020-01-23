@@ -1,14 +1,13 @@
 #include <vector>
+class Camera;
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void Transforms(GLuint,bool);
+void Transforms(GLuint,Camera&,bool);
 void ChangeTranslations(unsigned int, std::vector<glm::mat4>&stuff);
-void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 GLuint GetSkyBoxTexture(std::vector<std::string>& faces);
 GLuint GetTexture(const char* texturePath);
-void processInput(float elapsed_time, GLFWwindow* window);
-void SkyBoxTransforms(GLuint shaderProgram);
-using namespace glm;
+void processInput( GLFWwindow* window,Camera& camera, float elapsedTime,float velocity);
 #define PRINT \
+static bool once = true;\
 if (once)\
 {\
 	std::cout << "\n-----------------\n" << "View matrix\n-------------------\n";\
@@ -21,8 +20,9 @@ if (once)\
 		std::cout << std::endl;\
 	}\
 	once = false;\
-	std::cout << "-----------------\n" << std::endl;\
-}
+	std::cout << "-----------------\n" << std::endl; }
+int SCR_WIDTH = 800;
+int SCR_HEIGHT = 600;
 //Initialization of GlEW and GLFW libraries
 void InitGLEW()
 {
@@ -55,7 +55,7 @@ GLFWwindow* CreateGLFWwindow(int window_width, int window_height, const char* wi
 		glfwTerminate();
 		exit(-1);
 	}
-	glfwSetCursorPosCallback(window, mouse_callback);
+	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	glfwMakeContextCurrent(window);
 	InitGLEW();
