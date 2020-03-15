@@ -3,8 +3,6 @@
 #include <cmath>
 namespace math
 {
-
-
 	struct vectf3
 	{
 		union
@@ -209,8 +207,5 @@ namespace math
 	
 	
 	}
-
-
-
 
 }

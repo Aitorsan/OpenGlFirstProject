@@ -1,3 +1,4 @@
+#pragma once
 #include <vector>
 class Camera;
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -21,8 +22,11 @@ if (once)\
 	}\
 	once = false;\
 	std::cout << "-----------------\n" << std::endl; }
+
 int SCR_WIDTH = 800;
 int SCR_HEIGHT = 600;
+
+
 //Initialization of GlEW and GLFW libraries
 void InitGLEW()
 {

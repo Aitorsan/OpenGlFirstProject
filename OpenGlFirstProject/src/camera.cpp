@@ -3,7 +3,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include <GLFW/glfw3.h>
 Camera::Camera()
-    :Camera(0.0f, 0.0f, 2.0f, 45.0f)
+    :Camera(30.0f, 0.0f, -45.0f, 45.0f)
 {
 }
 

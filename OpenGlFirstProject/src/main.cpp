@@ -14,21 +14,25 @@
 #include "include/main.h"
 #include "include/Cubes.h"
 #include "include/camera.h"
+#include "include/WFObjLoader.h"
+#include "include/utilities.hpp"
+#include "include/Diagnostics.h"
 
-constexpr float fov = 45.0f;
 //thread stuff
 std::mutex mut;
 
-
 //projeciton matrix can be precomputed 
- glm::mat4 projectionMatrix = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)(SCR_HEIGHT), 0.5f, 10000.f);
+constexpr float fov = 45.0f;
+glm::mat4 projectionMatrix = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)(SCR_HEIGHT), 0.5f, 10000.f);
 
-Camera camera;
 ////////////////// MAIN ////////////////////////////////////////////////////////////////////////
 int main()
 {   
-	GLFWwindow* window = CreateGLFWwindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL Aitor");
+	std::string filep = "3dModels/c.txt";
+	WFObjLoader f(filep);
 
+	GLFWwindow* window = CreateGLFWwindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL Aitor");
+	Camera camera;
 	//sky box
 	float skyBoxVertices[108]{};
 	genSkyBoxCube(skyBoxVertices);
@@ -194,8 +198,8 @@ int main()
 		mut.lock();
 		std::size_t currsize = model_array.size();
 		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::mat4)*currsize, &model_array[0]);
-		glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, currsize);
 		mut.unlock();
+		glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, currsize);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -217,7 +221,6 @@ void Transforms(GLuint shaderProgram, Camera& camera , bool skybox = false)
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "camera"), 1, GL_FALSE, &cameraTranslation[0][0]);
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "project"), 1, GL_FALSE, &projectionMatrix[0][0]);
 }
-
 
 void ChangeTranslations(unsigned int amount ,std::vector<glm::mat4>& model_array)
 {
@@ -286,9 +289,10 @@ void processInput(GLFWwindow* window,Camera& camera ,float elapsedTime,float vel
 	{
 		velocity += 10.5f;
 	}
-	else if (velocity > 20.f)
+	if(glfwGetKey(window, GLFW_KEY_F) == GLFW_RELEASE)
 	{
-		velocity -= 0.2f;
+		if (velocity > 20.f)
+			velocity -= 0.2f;
 	}
 	
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) 
@@ -325,7 +329,16 @@ void processInput(GLFWwindow* window,Camera& camera ,float elapsedTime,float vel
 	{
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
-	
+
+	if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)
+	{
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_RELEASE)
+	{
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	}
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
@@ -338,3 +351,4 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	projectionMatrix = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)(SCR_HEIGHT), 0.5f, 10000.f);
 	glViewport(0, 0, width, height);
 }
+
