@@ -11,211 +11,375 @@ namespace
     const std::string VERTEX_POSITION{"v"};
 	const std::string VERTEX_TEXTURE {"vt"};
 	const std::string VERTEX_NORMAL  {"vn"};
-	const std::string INDICES{ "f" };
-	const std::string EMTPY_STRING{ " " };
+	const std::string INDICES{"f"};
+	const std::string EMTPY_STRING{" "};
+	constexpr std::size_t TRIANGULAR_FACES{3};
+
 }
 
-WFObjLoader::WFObjLoader(const std::string& sourceFile)
-	:FilePath{sourceFile}
+
+WFObjLoader::WFObjLoader( const std::string& sourceFile)
+	:FilePath{std::move(sourceFile)}
 {
-	CreateShape();
+	CreateMesh();
 }
 
-void WFObjLoader::CreateShape()
+void WFObjLoader::CreateMesh()
 {
-	std::vector<glm::vec3> vPositions;
-	std::vector<glm::vec2> vTextures;
-	std::vector<glm::vec3> vNormals;
-	std::vector<glm::uvec3> FIndices;
+	std::vector<Positions> vPositions;
+	std::vector<Normals> vNormals;
+	std::vector<Textures> vTextures;
+	std::vector<FaceIndices> fIndices;
+	std::vector<Vertex> meshVertices;
+	std::string data = ReadObjFile(FilePath);
 
-	ParseObjFile(vPositions,vTextures,vNormals,FIndices);
+	ParseObjData(data,vPositions,vTextures,vNormals,fIndices);
 
-	std::vector<Vertex> raw_vertices;
-
-	for (auto f_index : FIndices)
+	if (vNormals.empty() && vTextures.empty())
 	{
-		Vertex vert{};
-		vert.v = vPositions[f_index.x];
-		if (!vTextures.empty())
-			vert.vt = vTextures[f_index.y];
-		if (!vNormals.empty())
-			vert.vn = vNormals[f_index.z];
-		raw_vertices.push_back(std::move(vert));
+		// we have only positions
+		for (auto& indices : fIndices)
+		{
+			Vertex v;
+			Positions pos = vPositions[indices.front()];
+			v.index = indices.front();
+			v.v = { pos[0], pos[1],pos[2] };
+			meshVertices.push_back(std::move(v));
+		}
+
+		for (auto& vertex : meshVertices)
+		{
+			Mesh.push_back(vertex.v.x);
+			Mesh.push_back(vertex.v.y);
+			Mesh.push_back(vertex.v.z);
+		}
 	}
-
-	std::vector<Vertex> NoDuplicateShapeVertices;
-	unsigned int current_index = 0;
-	// create indices for Index buffer object 
-	for (auto& vert : raw_vertices)
+	else if (vTextures.empty())// positions/Normals
 	{
-		auto begin_it = NoDuplicateShapeVertices.begin();
-		auto end_it = NoDuplicateShapeVertices.end();
-		auto result_it = std::find_if(begin_it, end_it, [&](Vertex& v)
+		// we have positions/normals
+		for (auto& indices : fIndices)
 		{
-			return v == vert;
-		});
+			Vertex v;
+			Positions pos = vPositions[indices.front()];
+			Normals norm = vNormals[indices.back()];
+			v.index = indices.front();
+			v.v = { pos[0], pos[1],pos[2] };
+			v.vn = { norm[0], norm[1],norm[2] };
 
-		if (result_it != end_it)
+			meshVertices.push_back(std::move(v));
+		}
+
+		for (auto& vertex : meshVertices)
 		{
-			Indices.push_back(result_it->index);
+			Mesh.push_back(vertex.v.x);
+			Mesh.push_back(vertex.v.y);
+			Mesh.push_back(vertex.v.z);
+			Mesh.push_back(vertex.vn.x);
+			Mesh.push_back(vertex.vn.y);
+			Mesh.push_back(vertex.vn.z);
+
+		}
+
+	}
+	else if (vNormals.empty())// positons/Textures
+	{
+		// we have positions/textures
+		for (auto& indices : fIndices)
+		{
+			Vertex v;
+			Positions pos = vPositions[indices.front()];
+			Textures text = vTextures[indices.back()];
+			v.index = indices.front();
+			v.v = { pos[0], pos[1],pos[2] };
+			if (text.size() < 3)
+				v.vt2D = { text[0], text[1] };
+			else
+			{
+				v.vt3D = { text[0], text[1],text[2] };
+				v.has3Dtexture = true;
+			}
+			meshVertices.push_back(std::move(v));
+		}
+
+		for (auto& vertex : meshVertices)
+		{
+			Mesh.push_back(vertex.v.x);
+			Mesh.push_back(vertex.v.y);
+			Mesh.push_back(vertex.v.z);
+
+			if (vertex.has3Dtexture)
+			{
+				Mesh.push_back(vertex.vt3D.x);
+				Mesh.push_back(vertex.vt3D.y);
+				Mesh.push_back(vertex.vt3D.z);
+			}
+			else
+			{
+				Mesh.push_back(vertex.vt2D.x);
+				Mesh.push_back(vertex.vt2D.y);
+			}
+
+		}
+
+	}
+	else if( !vPositions.empty())// make sure nothing went wrong
+	{
+		//cool we have a full vertex the size is 3
+		for (auto& indices : fIndices)
+		{
+			Vertex v;
+			Positions pos =vPositions[indices.front()];
+			Textures text = vTextures[indices.at(1)];
+			Normals norm = vNormals[indices.back()];
+
+			v.index = indices.front();
+			v.v  = { pos[0], pos[1],pos[2] };
+			v.vn = { norm[0], norm[1],norm[2] };
+
+			if (text.size() < 3)
+				v.vt2D = { text[0], text[1] };
+			else
+			{
+				v.vt3D = { text[0], text[1],text[2] };
+				v.has3Dtexture = true;
+			}
+
+			meshVertices.push_back(std::move(v));
+		}
+
+		for (auto& vertex : meshVertices)
+		{
+			Mesh.push_back(vertex.v.x);
+			Mesh.push_back(vertex.v.y);
+			Mesh.push_back(vertex.v.z);
+			
+			if (vertex.has3Dtexture)
+			{
+				Mesh.push_back(vertex.vt3D.x);
+				Mesh.push_back(vertex.vt3D.y);
+				Mesh.push_back(vertex.vt3D.z);
+			}
+			else
+			{
+				Mesh.push_back(vertex.vt2D.x);
+				Mesh.push_back(vertex.vt2D.y);
+			}
+			
+			Mesh.push_back(vertex.vn.x);
+			Mesh.push_back(vertex.vn.y);
+			Mesh.push_back(vertex.vn.z);
+		}
+	}
+}
+
+std::string WFObjLoader::ReadObjFile(const std::string& file)
+{
+	std::fstream f(file);
+
+	if (!f.is_open())
+		return std::string();
+	
+	std::string data{std::istreambuf_iterator<char>(f),std::istreambuf_iterator<char>()};
+
+	return data;
+}
+
+void WFObjLoader::ParseObjData(const std::string& data, std::vector<Positions>& vP, std::vector<Textures>& vT, 
+	                                            std::vector<Normals>& vN, std::vector<FaceIndices>& fI)
+{
+	std::vector<std::string> tokens;
+	split_str(data, tokens, '\n');
+	// fill in the vectors
+	for (std::string& token : tokens)
+	{
+		std::vector<std::string> splitedToken;
+		split_str(token, splitedToken);
+
+		if (!splitedToken.empty())
+		{
+			auto& vertex_type = splitedToken.front();
+			if (vertex_type == VERTEX_POSITION)
+			{ 
+				splitedToken.erase(splitedToken.begin());
+				AddVertexPositions(vP, splitedToken);
+			}
+			else if (vertex_type == VERTEX_TEXTURE)
+			{
+				splitedToken.erase(splitedToken.begin());
+				AddTextureCoordinates(vT, splitedToken);
+			}
+			else if (vertex_type == VERTEX_NORMAL)
+			{
+				splitedToken.erase(splitedToken.begin());
+				AddNormals(vN, splitedToken);
+			}
+			else if (vertex_type == INDICES)
+			{
+				splitedToken.erase(splitedToken.begin());
+				AddFaceIndices(fI, splitedToken);
+			}
+		}
+	}
+}
+
+
+
+void WFObjLoader::AddVertexPositions(std::vector<Positions>& vps, std::vector<std::string>& vertexTokens)
+{
+	Positions vposition;
+	for (std::string& token : vertexTokens)
+	{
+		float vp = str_to_number<float>(token);
+		vposition.push_back(vp);
+	}
+	vps.push_back(std::move(vposition));
+}
+
+void WFObjLoader::AddTextureCoordinates(std::vector<Textures>& vts, std::vector<std::string>& textureTokens)
+{
+	Textures vtexture;
+	for (std::string& token : textureTokens)
+	{
+		float vt = str_to_number<float>(token);
+		vtexture.push_back(vt);
+	}
+	vts.push_back(std::move(vtexture));
+}
+
+void WFObjLoader::AddNormals(std::vector<Normals>& vn, std::vector<std::string>& normalsTokens)
+{
+	Normals vnormal;
+	for (std::string& token : normalsTokens)
+	{
+		float vp = str_to_number<float>(token);
+		vnormal.push_back(vp);
+	}
+	vn.push_back(std::move(vnormal));
+}
+
+
+void WFObjLoader::AddFaceIndices(std::vector<FaceIndices>& fi, std::vector<std::string>& facesTokens)
+{
+		std::vector<std::string> posIndices;
+		std::vector<std::string> textureIndices;
+		std::vector<std::string> normalIndices;
+		for (int i = 0; i < facesTokens.size(); ++i)
+		{
+			std::string& token = facesTokens[i];
+
+			std::vector<std::string> faceIndices;
+			faceIndices = split_str(token, faceIndices, '/');
+			std::size_t tSize = faceIndices.size();
+
+			if (tSize == 0 && !token.empty())
+			{  
+				posIndices.push_back(token);
+			}
+			else if (tSize == 3)
+			{
+				posIndices.push_back(faceIndices.front());
+				textureIndices.push_back(faceIndices.at(1));
+				normalIndices.push_back(faceIndices.back());
+			}
+			else if (tSize == 2)
+			{
+				// count the number of / to understand if we have positions/ textures or positions/ nomals
+				size_t n = std::count(token.begin(), token.end(), '/');
+				if (n == 1) // positions/ textures
+				{
+					posIndices.push_back(faceIndices.front());
+					textureIndices.push_back(faceIndices.back());
+				}
+				else if (n == 2)// positions/normals
+				{
+					posIndices.push_back(faceIndices.front());
+					normalIndices.push_back(faceIndices.back());
+				}
+			}
+		}
+
+		//if the format is specified in quads we need to create triangular faces oursevles
+		if (facesTokens.size() > TRIANGULAR_FACES)
+		{
+			TransformQuadFacesToTriangularFaces(fi, posIndices,textureIndices,normalIndices);
 		}
 		else
 		{
-			vert.index = current_index;
-			Indices.push_back(current_index);
-			++current_index;
-			NoDuplicateShapeVertices.push_back(std::move(vert));
+			for (int i = 0; i < posIndices.size(); ++i)
+			{
+				FaceIndices faces{};
+				faces.push_back(str_to_number<unsigned int>(posIndices[i]) - 1);
+				if (!textureIndices.empty())
+					faces.push_back(str_to_number<unsigned int>(textureIndices[i]) - 1);
+				if (!normalIndices.empty())
+					faces.push_back(str_to_number<unsigned int>(normalIndices[i]) - 1);
+				fi.push_back(std::move(faces));
+			}
+		}
+}
+
+void WFObjLoader::TransformQuadFacesToTriangularFaces(std::vector<FaceIndices>& fi, const std::vector<std::string>& posIndices,
+																				const std::vector<std::string>& textureIndices,
+																				const std::vector<std::string>& normalIndices)
+{
+	// transform in tirangular faces
+	// eg: 1 2 3 4  -> 1 2 3 1 3 4
+	std::vector<std::string> triangularIndexPositions{};
+	std::size_t np = posIndices.size();
+	for (int i = 0; i < np - 2; ++i)
+	{
+		triangularIndexPositions.push_back(posIndices[0]);
+		triangularIndexPositions.push_back(posIndices[i + 1]);
+		triangularIndexPositions.push_back(posIndices[i + 2]);
+	}
+
+	std::vector<std::string> triangularIndexTextures{};
+
+	if (!textureIndices.empty())
+	{
+		std::size_t nt = textureIndices.size();
+		for (int i = 0; i < nt - 2; ++i)
+		{
+			triangularIndexTextures.push_back(textureIndices[0]);
+			triangularIndexTextures.push_back(textureIndices[i + 1]);
+			triangularIndexTextures.push_back(textureIndices[i + 2]);
 		}
 	}
 
-	for (auto& vertex : NoDuplicateShapeVertices)
+	std::vector<std::string> triangularIndexNormals{};
+	if (!normalIndices.empty())
 	{
-		RawShape.push_back(vertex.v.x);
-		RawShape.push_back(vertex.v.y);
-		RawShape.push_back(vertex.v.z);
-		RawShape.push_back(vertex.vt.x);
-		RawShape.push_back(vertex.vt.y);
-		RawShape.push_back(vertex.vn.x);
-		RawShape.push_back(vertex.vn.y);
-		RawShape.push_back(vertex.vn.z);
+		std::size_t n = normalIndices.size();
+		for (int i = 0; i < n - 2; ++i)
+		{
+			triangularIndexNormals.push_back(normalIndices[0]);
+			triangularIndexNormals.push_back(normalIndices[i + 1]);
+			triangularIndexNormals.push_back(normalIndices[i + 2]);
+		}
+	}
+	
+	for (int i = 0; i < triangularIndexPositions.size(); ++i)
+	{
+		FaceIndices faces{};
+		faces.push_back(str_to_number<unsigned int>(triangularIndexPositions[i]) - 1);
+		if (!triangularIndexTextures.empty() && i < triangularIndexTextures.size())
+			faces.push_back(str_to_number<unsigned int>(triangularIndexTextures[i]) - 1);
+		if (!triangularIndexNormals.empty() && i < triangularIndexNormals.size())
+			faces.push_back(str_to_number<unsigned int>(triangularIndexNormals[i]) - 1);
+		fi.push_back(std::move(faces));
 	}
 }
+
+
 
 std::vector<unsigned int> WFObjLoader::GetIndices()
 {
 	return Indices;
 }
 
-std::vector<float> WFObjLoader::GetRawShape()
+std::vector<float>& WFObjLoader::GetMesh()
 {
-	return RawShape;
-}
-
-void WFObjLoader::ParseObjFile(std::vector<glm::vec3>& vPositions, std::vector<glm::vec2>& vTextures,
-							   std::vector<glm::vec3>& vNormals, std::vector<glm::uvec3>& FIndices)
-{
-	std::ifstream file(FilePath,std::ifstream::in );
-	if (!file.is_open())
-	{
-		LOG_ERROR( "opening file "+ FilePath );
-		return;
-	}
-	//read the file into a string
-	std::string data{ std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
-	file.close();
-
-	std::vector<std::string>tokens;
-	tokens = split_str(data, tokens,'\n');
-	// fill in the vectors
-	for (auto& token : tokens)
-	{
-		std::vector<std::string> splited_token;
-		splited_token = split_str(token, splited_token);
-		if (!splited_token.empty())
-		{
-			auto& vertex_type = splited_token.front();
-			if (vertex_type == VERTEX_POSITION)
-			{
-				AddVertex(vPositions, splited_token);
-			}
-			else if (vertex_type == VERTEX_TEXTURE)
-			{
-				AddVertexTexture(vTextures, splited_token);
-			}
-			else if (vertex_type == VERTEX_NORMAL)
-			{
-				AddVertex(vNormals, splited_token);
-			}
-			else if (vertex_type == INDICES)
-			{
-				AddFIndex(FIndices, splited_token);
-			}
-		}
-	}
-}
-
-std::vector<glm::vec3>& WFObjLoader::AddVertex(std::vector<glm::vec3>& vertices, std::vector<std::string>& splited_token)
-{
-	glm::vec3 values{};
-	short position{ 0 };
-	for (int i = 1; i < splited_token.size();++i)
-	{
-		std::stringstream buffer(splited_token[i]);
-		float vertex;
-		if (!(buffer >> vertex))
-		{
-			LOG_ERROR("failed converting vertex position into float: "+splited_token[i]);
-		}
-		else
-		{
-			values[position] = vertex;
-			++position;
-		}
-	}
-	vertices.push_back(values);
-	return vertices;
-}
-
-std::vector<glm::vec2>& WFObjLoader::AddVertexTexture(std::vector<glm::vec2>& vTextures, std::vector<std::string>& splited_token)
-{
-	glm::vec2 values{};
-	short position{ 0 };
-	for (int i = 1; i < splited_token.size(); ++i)
-	{
-		std::stringstream buffer(splited_token[i]);
-		float vertex;
-		if (!(buffer >> vertex))
-		{
-			LOG_ERROR("failed converting vertex texture into float: " + splited_token[i]);
-		}
-		else
-		{
-			values[position] = vertex;
-			++position;
-		}
-	}
-	vTextures.push_back(values);
- 	return vTextures;
-}
-
-std::vector<glm::uvec3>& WFObjLoader::AddFIndex(std::vector<glm::uvec3>& FIndices, std::vector<std::string>& splitedToken)
-{  	// parse the indices but subtracting one from them
-	for (int i = 1; i < splitedToken.size(); ++i)
-	{
-		std::vector<std::string> ts;
-		glm::uvec3 findice;
-		auto& currToken = splitedToken[i];
-		ts = split_str(currToken, ts,'/');
-		if (ts.empty())
-		{
-			// case where no / are found means we only have vertex positions
-			ts = split_str(currToken, ts);
-			findice[0] = str_to_number<unsigned int>(ts.front()) - 1;
-			findice[1] = str_to_number<unsigned int>(ts.at(1)) - 1;
-			findice[2] = str_to_number<unsigned int>(ts.back()) - 1;
-
-		}
-		// If we find / and the size is 2 it means 
-		// we have position and texture coordinates but not normals
-		else if( ts.size() == 2)
-		{   
-			findice[0] = str_to_number<unsigned int>(ts.front()) - 1;
-			findice[1] = str_to_number<unsigned int>(ts.back()) - 1;
-		}
-		// If we find // the size will be 3 because we add one empty extra string in place of one of the '/' 
-	    // This means we have position and normals but not texture coordinates
-		else if (ts.size() == 3)
-		{
-			findice[0] = str_to_number<unsigned int>(ts.front()) - 1;
-			if (ts.at(1) != EMTPY_STRING)
-			{
-				findice[1] = str_to_number<unsigned int>(ts.at(1)) - 1;
-			}
-			findice[2] = str_to_number<unsigned int>(ts.back()) - 1;
-		}
-		FIndices.push_back(findice);
-	}	
-	return FIndices;
+	return Mesh;
 }
 
 

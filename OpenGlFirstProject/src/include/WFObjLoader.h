@@ -6,22 +6,30 @@
 class WFObjLoader
 {
 public:
+	using Positions = std::vector<float>;
+	using Normals = std::vector<float>;
+	using Textures = std::vector<float>;
+	using FaceIndices = std::vector<int>;
+
 	WFObjLoader(const std::string& filePath);	
 	std::vector<unsigned int> GetIndices();
-	std::vector<float> GetRawShape();
+	std::vector<float>& GetMesh();
+	
 private:
-	void CreateShape();
-	void ParseObjFile(std::vector<glm::vec3>& vPositions,
-	                  std::vector<glm::vec2>& vTextures,
-	                  std::vector<glm::vec3>& vNormals,
-	                  std::vector<glm::uvec3>& FIndices );
-	std::vector<glm::vec3>& AddVertex(std::vector<glm::vec3>& vertices, std::vector<std::string>& splited_token);
-	std::vector<glm::vec2>& AddVertexTexture(std::vector<glm::vec2>& vTextures,std::vector<std::string>& splited_token);
-	std::vector<glm::uvec3>& AddFIndex(std::vector<glm::uvec3>& FIndices,std::vector<std::string>& splited_token);
+	void CreateMesh();
+	std::string ReadObjFile(const std::string& file);
+	void ParseObjData(const std::string& d, std::vector<Positions>&, std::vector<Textures>&, std::vector<Normals>&, std::vector<FaceIndices>& );
+	void AddNormals(std::vector<Normals>& vn, std::vector<std::string>& normalsTokens);
+	void AddVertexPositions(std::vector<Positions>& vps, std::vector<std::string>& vertexTokens);
+	void AddTextureCoordinates(std::vector<Textures>& vps, std::vector<std::string>& textureTokens);
+	void AddFaceIndices(std::vector<FaceIndices>& fi, std::vector<std::string>& facesTokens);
 
+	void TransformQuadFacesToTriangularFaces(std::vector<FaceIndices>& fi, const std::vector<std::string>& posIndices,
+		const std::vector<std::string>& textureIndices,
+		const std::vector<std::string>& normalIndices);
 
 	const std::string& FilePath;	
 	std::vector<unsigned int> Indices;
-	std::vector<float> RawShape;
+	std::vector<float> Mesh;
 };
 

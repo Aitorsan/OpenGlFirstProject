@@ -1,4 +1,7 @@
+
+
 #include <GL/glew.h>
+#define GLFW_DLL
 #include <GLFW/glfw3.h>
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -6,6 +9,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #include <iostream>
+#include <iomanip>
+#include <fstream>
 #include <thread>
 #include <future>
 #include <chrono>
@@ -26,13 +31,10 @@ constexpr float fov = 45.0f;
 glm::mat4 projectionMatrix = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)(SCR_HEIGHT), 0.5f, 10000.f);
 
 ////////////////// MAIN ////////////////////////////////////////////////////////////////////////
-int main()
+int main()                           
 {   
-	std::string filep = "3dModels/c.txt";
-	WFObjLoader f(filep);
-
 	GLFWwindow* window = CreateGLFWwindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL Aitor");
-	Camera camera;
+	Camera camera(0.0f,0.0f,0.0f,45.f);
 	//sky box
 	float skyBoxVertices[108]{};
 	genSkyBoxCube(skyBoxVertices);
@@ -43,7 +45,7 @@ int main()
 	genCubeWithTextureCoordsAndIndices(cube,cubeIndices);
 	//light is a sphere written by a third party
 	Sphere lightSphere;
-	
+		
 	//light position
 	glm::vec3 lightPosition(0.0f,0.0f,-0.5f);
 	//light color
@@ -55,6 +57,30 @@ int main()
 	GLuint shaderProgram = CreateShaderProgram("shaders/vertex.shader", "shaders/fragment.shader");
 	GLuint lightShaderProgram = CreateShaderProgram("shaders/lightVertex.shader","shaders/lightFragment.shader");
 	GLuint skyBoxShaderProgram = CreateShaderProgram("shaders/skyBoxVertex.shader", "shaders/skyBoxFragment.shader");
+	GLuint modelShaderProgram = CreateShaderProgram("shaders/modelVertex.shader", "shaders/modelFragment.shader");
+	/**********************************
+	* Object loader shape
+	***********************************/
+	WFObjLoader f("3dModels/kettle.txt");
+	auto rawModel = f.GetMesh();
+
+	GLuint shapeVAO, shapeVBO;
+	glGenVertexArrays(1, &shapeVAO);
+	glGenBuffers(1, &shapeVBO);
+	glBindVertexArray(shapeVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, shapeVBO);
+	glBufferData(GL_ARRAY_BUFFER, rawModel.size()*sizeof(float), rawModel.data(), GL_STATIC_DRAW);
+
+	
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT,GL_FALSE, 8* sizeof(float), 0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3*sizeof(float)));
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+	
+	glBindVertexArray(0);
+
 	/*************************************
 	* Light buffer objects
 	**************************************/
@@ -110,12 +136,12 @@ int main()
 	//position data layout
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8* sizeof(float), 0);
-	//normals
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8* sizeof(float), (void*)(3*sizeof(float)));
 	//texture data 
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	//normals
 	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8* sizeof(float), (void*)(6*sizeof(float)));
 
     // Instancing buffer for the cubes
 	const unsigned int amount = 10000;
@@ -152,6 +178,7 @@ int main()
 
 	float last{0};
 	float velocity = 10.f;
+	glBindVertexArray(0);
 
 	while (!glfwWindowShouldClose(window))
 	{   
@@ -160,6 +187,7 @@ int main()
 		last = current;
 		
 		processInput(window,camera,elapsed,velocity);
+		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
 		//Draw skybox
@@ -200,6 +228,18 @@ int main()
 		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::mat4)*currsize, &model_array[0]);
 		mut.unlock();
 		glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, currsize);
+		
+        //DRAW last stuff
+		glUseProgram(modelShaderProgram);
+		Transforms(modelShaderProgram,camera, false);
+
+		glm::mat4 modelobj = glm::mat4(1.0f);
+		modelobj = glm::scale(modelobj, glm::vec3(3.0f, 3.0f, 3.0f));
+		modelobj = glm::translate(modelobj, glm::vec3(0,0,-10.f));
+		glUniformMatrix4fv(glGetUniformLocation(modelShaderProgram, "model"), 1, GL_FALSE, &modelobj[0][0]);
+		glBindVertexArray(shapeVAO);
+		glDrawArrays(GL_TRIANGLES, 0,rawModel.size());
+
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();

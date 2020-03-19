@@ -152,6 +152,8 @@ void getCube(float(&cube)[36*6])
 	   -0.5f,  0.5f,  0.5f,     1.0f, 0.0f,0.0f,
 	   -0.5f,  0.5f, -0.5f,     1.0f, 0.0f,0.0f
 	};
+
+	std::copy(std::begin(internalCube), std::end(internalCube), std::begin(cube));
 }
 
 void getWhiteCube(float(&cube)[36 * 6])
