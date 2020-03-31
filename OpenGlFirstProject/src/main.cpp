@@ -23,6 +23,8 @@
 #include "include/utilities.hpp"
 #include "include/Diagnostics.h"
 
+GLuint DRAW_TYPE= GL_FILL;
+
 //thread stuff
 std::mutex mut;
 
@@ -34,7 +36,7 @@ glm::mat4 projectionMatrix = glm::perspective(glm::radians(fov), (float)SCR_WIDT
 int main()                           
 {   
 	GLFWwindow* window = CreateGLFWwindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL Aitor");
-	Camera camera(0.0f,0.0f,0.0f,45.f);
+	Camera camera(0.0f,0.0f,100.0f,45.f);
 	//sky box
 	float skyBoxVertices[108]{};
 	genSkyBoxCube(skyBoxVertices);
@@ -49,7 +51,7 @@ int main()
 	//light position
 	glm::vec3 lightPosition(0.0f,0.0f,-0.5f);
 	//light color
-	glm::vec3 lightColor(1.9f, 1.9f, 1.9f);
+	glm::vec3 lightColor(0.9f, 0.9f, 0.9f);
 
 	/*************************************
 	* Shader programs
@@ -61,19 +63,48 @@ int main()
 	/**********************************
 	* Object loader shape
 	***********************************/
-	WFObjLoader f("3dModels/kettle.txt");
-	auto rawModel = f.GetMesh();
+	std::string data = ReadObjFile("3dModels/Bugatti.txt");
+	WFObjLoader f(data,WFObjLoader::GEN_INDICES);
+	auto rawModel = f.GetModelDataForIndexing();
+	auto indicesf = f.GetIndices();
 
-	GLuint shapeVAO, shapeVBO;
+/*
+	std::ofstream mofile("model.txt");
+	if (!mofile.is_open())
+		return -1;
+
+	for (int i = 0; i < rawModel.size();++i)
+	{
+		mofile << rawModel[i];
+		if ((i+1)% 8 == 0 && i != 0)
+			mofile << std::endl;
+		else
+			mofile << " , ";
+	}
+	mofile << std::endl << "-------------\n indices\n----------------" << std::endl;
+	for (int i = 0; i < indicesf.size(); ++i)
+	{
+		mofile << indicesf[i];
+		if ((i + 1) % 8 == 0 && i != 0)
+			mofile << std::endl;
+		else
+			mofile << " , ";
+	}*/
+
+	GLuint shapeVAO, shapeVBO,shapeEBO;
 	glGenVertexArrays(1, &shapeVAO);
 	glGenBuffers(1, &shapeVBO);
+	glGenBuffers(1, &shapeEBO);
 	glBindVertexArray(shapeVAO);
 	glBindBuffer(GL_ARRAY_BUFFER, shapeVBO);
 	glBufferData(GL_ARRAY_BUFFER, rawModel.size()*sizeof(float), rawModel.data(), GL_STATIC_DRAW);
 
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shapeEBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesf.size() * sizeof(GLuint), indicesf.data(), GL_STATIC_DRAW);
+
 	
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT,GL_FALSE, 8* sizeof(float), 0);
+	glVertexAttribPointer(0, 3, GL_FLOAT,GL_TRUE, 8* sizeof(float), 0);
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3*sizeof(float)));
 	glEnableVertexAttribArray(2);
@@ -152,7 +183,7 @@ int main()
 	glGenBuffers(1, &vb_instance);
 	glBindBuffer(GL_ARRAY_BUFFER, vb_instance);
 	glBufferData(GL_ARRAY_BUFFER, amount * sizeof(glm::mat4), NULL, GL_DYNAMIC_DRAW);
-	GLsizei vec4Size = sizeof(glm::vec4);
+	unsigned long long vec4Size = sizeof(glm::vec4);
 
 	glEnableVertexAttribArray(3);
 	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)0);
@@ -161,7 +192,7 @@ int main()
 	glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)(vec4Size));
 
 	glEnableVertexAttribArray(5);
-	glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)(2 * vec4Size));
+	glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4u * vec4Size, (void*)(2u * vec4Size));
 
 	glEnableVertexAttribArray(6);
 	glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)(3 * vec4Size));
@@ -182,12 +213,13 @@ int main()
 
 	while (!glfwWindowShouldClose(window))
 	{   
+
 		float current = glfwGetTime();
 		float elapsed = current - last;
 		last = current;
 		
 		processInput(window,camera,elapsed,velocity);
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+		glClearColor(0.5f, 0.7f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
 		//Draw skybox
@@ -199,6 +231,7 @@ int main()
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, skyBoxTexture);
 		glDisable(GL_DEPTH_TEST);
+		glPolygonMode(GL_FRONT_AND_BACK, DRAW_TYPE);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 		glEnable(GL_DEPTH_TEST);
 
@@ -212,7 +245,7 @@ int main()
 		glUniformMatrix4fv(glGetUniformLocation(lightShaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
 		glUniform3fv(glGetUniformLocation(lightShaderProgram, "lightColor"), 1, &lightColor[0]);
 		glBindVertexArray(lightVAO);
-		lightSphere.draw();
+		lightSphere.draw(DRAW_TYPE);
 
 		//draw cubes
 		glUseProgram(shaderProgram);
@@ -227,6 +260,7 @@ int main()
 		std::size_t currsize = model_array.size();
 		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::mat4)*currsize, &model_array[0]);
 		mut.unlock();
+		glPolygonMode(GL_FRONT_AND_BACK, DRAW_TYPE);
 		glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, currsize);
 		
         //DRAW last stuff
@@ -234,11 +268,20 @@ int main()
 		Transforms(modelShaderProgram,camera, false);
 
 		glm::mat4 modelobj = glm::mat4(1.0f);
-		modelobj = glm::scale(modelobj, glm::vec3(3.0f, 3.0f, 3.0f));
-		modelobj = glm::translate(modelobj, glm::vec3(0,0,-10.f));
+		auto times = (float)glfwGetTime();
+		//modelobj = glm::rotate(modelobj,glm::radians(times)*20, glm::vec3(0.f, 1.f, 0.f));
+		modelobj = glm::translate(modelobj, glm::vec3(0,30, 0));
+
 		glUniformMatrix4fv(glGetUniformLocation(modelShaderProgram, "model"), 1, GL_FALSE, &modelobj[0][0]);
 		glBindVertexArray(shapeVAO);
-		glDrawArrays(GL_TRIANGLES, 0,rawModel.size());
+		glPolygonMode(GL_FRONT_AND_BACK, DRAW_TYPE);
+		//glDrawArrays(GL_TRIANGLES, 0,9);
+		//modelobj = glm::rotate(modelobj, times, glm::vec3(0.f, 2.0f, 0.f));
+		//modelobj = glm::translate(modelobj, glm::vec3(2.0f, 0.0f, cos(times/2.0f) * 6.0));
+		glUniformMatrix4fv(glGetUniformLocation(modelShaderProgram, "model"), 1, GL_FALSE, &modelobj[0][0]);
+		glPolygonMode(GL_FRONT_AND_BACK, DRAW_TYPE);
+		//glDrawArrays(GL_TRIANGLES, 0, rawModel.size());
+		glDrawElements(GL_TRIANGLES, indicesf.size(), GL_UNSIGNED_INT, 0);
 
 
 		glfwSwapBuffers(window);
@@ -268,8 +311,8 @@ void ChangeTranslations(unsigned int amount ,std::vector<glm::mat4>& model_array
 	{
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::scale(model, glm::vec3(2.0f, 2.0f, 2.0f));
-		model = glm::rotate(model, glm::radians(float(i)), glm::vec3(1.0f, 0.3f, 0.5f));
-		model = glm::translate(model, glm::vec3(sin(203.0f*i/800)*403,cos(301.0f*i/400)*401,sin(400.0f*i/600)*405));
+		model = glm::rotate(model, glm::radians(float(glfwGetTime())), glm::vec3(1.0f, 0.3f, 0.5f));
+		model = glm::translate(model, glm::vec3(sin(203.0f*i/400)*400,cos(301.0f*i/400)*401,sin(400.0f*i/600)*405));
 		mut.lock();
 		model_array.push_back( model);
 		mut.unlock();	
@@ -324,6 +367,15 @@ GLuint GetTexture(const char* texturePath)
 void processInput(GLFWwindow* window,Camera& camera ,float elapsedTime,float velocity)
 {
 	camera.CheckMouseMovement(*window);
+
+	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+	{
+		DRAW_TYPE = GL_LINE;
+	}
+	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE)
+	{
+		DRAW_TYPE = GL_FILL;
+	}
 	
 	if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
 	{

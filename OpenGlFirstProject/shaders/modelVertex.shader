@@ -12,5 +12,5 @@ uniform mat4 model;
 void main()
 {
 	gl_Position = project * camera *model* vec4(position, 1.0f);
-	color_in = normals;
+	color_in = abs(normals);
 }

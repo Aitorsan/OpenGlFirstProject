@@ -9,7 +9,7 @@ Camera::Camera()
 
 Camera::Camera(float x, float y, float z, float fov)
 	: CameraPos{x,y,z}
-	, CameraFront{ 0, 0,-1.0f }
+	, CameraFront{ 0, 0,0.0f }
 	, CameraUp{ 0, 1, 0 }
 	, yaw{-90}
 	, pitch{0.0f}

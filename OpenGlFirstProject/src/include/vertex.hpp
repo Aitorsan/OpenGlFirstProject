@@ -1,5 +1,4 @@
 #pragma once
-
 #include <glm/glm.hpp>
 #include <limits>
 
@@ -10,6 +9,8 @@ struct Vertex
 	glm::vec3 vt3D;
 	glm::vec3 vn;
 	unsigned int index;
+	unsigned int vtIndex;
+	unsigned int vnIndex;
 	bool has3Dtexture = false;
 
 	Vertex()

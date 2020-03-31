@@ -3,7 +3,6 @@
 #include "include/Diagnostics.h"
 #include <algorithm>
 #include <iostream>
-#include <fstream>
 #include <sstream>
 
 namespace
@@ -14,26 +13,28 @@ namespace
 	const std::string INDICES{"f"};
 	const std::string EMTPY_STRING{" "};
 	constexpr std::size_t TRIANGULAR_FACES{3};
-
 }
 
 
-WFObjLoader::WFObjLoader( const std::string& sourceFile)
-	:FilePath{std::move(sourceFile)}
+WFObjLoader::WFObjLoader(const std::string& modelData, GENOPTION option)
+	: Indices{}
+	, ModelRawData{}
+	, posVertexLength{3}
+	, normVertexLength{-1}
+	, textureVertexLength{-1}
 {
-	CreateMesh();
+	CreateModelRawData(modelData);
 }
 
-void WFObjLoader::CreateMesh()
+void WFObjLoader::CreateModelRawData(const std::string& modelData)
 {
 	std::vector<Positions> vPositions;
 	std::vector<Normals> vNormals;
 	std::vector<Textures> vTextures;
 	std::vector<FaceIndices> fIndices;
-	std::vector<Vertex> meshVertices;
-	std::string data = ReadObjFile(FilePath);
-
-	ParseObjData(data,vPositions,vTextures,vNormals,fIndices);
+	std::vector<Vertex> ModelRawDataVertices;
+	
+	ParseObjData(modelData,vPositions,vTextures,vNormals,fIndices);
 
 	if (vNormals.empty() && vTextures.empty())
 	{
@@ -41,55 +42,46 @@ void WFObjLoader::CreateMesh()
 		for (auto& indices : fIndices)
 		{
 			Vertex v;
-			Positions pos = vPositions[indices.front()];
-			v.index = indices.front();
+			const int& posIndex = indices.front();
+			Positions pos = vPositions[posIndex];
+			v.index = posIndex;
 			v.v = { pos[0], pos[1],pos[2] };
-			meshVertices.push_back(std::move(v));
+			ModelRawDataVertices.push_back(std::move(v));
 		}
 
-		for (auto& vertex : meshVertices)
-		{
-			Mesh.push_back(vertex.v.x);
-			Mesh.push_back(vertex.v.y);
-			Mesh.push_back(vertex.v.z);
-		}
 	}
-	else if (vTextures.empty())// positions/Normals
+	else if (vTextures.empty())// we have positions/Normals
 	{
-		// we have positions/normals
+		normVertexLength = 3;
+		
 		for (auto& indices : fIndices)
 		{
 			Vertex v;
-			Positions pos = vPositions[indices.front()];
-			Normals norm = vNormals[indices.back()];
-			v.index = indices.front();
+			const int& posIndex = indices.front();
+			const int& normIndex = indices.at(1);
+			Positions pos = vPositions[posIndex];
+			Normals norm = vNormals[normIndex];
+			v.index = posIndex;
+			v.vnIndex = normIndex;
 			v.v = { pos[0], pos[1],pos[2] };
 			v.vn = { norm[0], norm[1],norm[2] };
 
-			meshVertices.push_back(std::move(v));
+			ModelRawDataVertices.push_back(std::move(v));
 		}
-
-		for (auto& vertex : meshVertices)
-		{
-			Mesh.push_back(vertex.v.x);
-			Mesh.push_back(vertex.v.y);
-			Mesh.push_back(vertex.v.z);
-			Mesh.push_back(vertex.vn.x);
-			Mesh.push_back(vertex.vn.y);
-			Mesh.push_back(vertex.vn.z);
-
-		}
-
 	}
-	else if (vNormals.empty())// positons/Textures
+	else if (vNormals.empty())// we have  positons/Textures
 	{
-		// we have positions/textures
+		textureVertexLength = 2;
+
 		for (auto& indices : fIndices)
 		{
 			Vertex v;
-			Positions pos = vPositions[indices.front()];
-			Textures text = vTextures[indices.back()];
-			v.index = indices.front();
+			const int& posIndex = indices.front();
+			const int& textIndex = indices.at(1);
+			Positions pos = vPositions[posIndex];
+			Textures text = vTextures[textIndex];
+			v.index = posIndex;
+			v.vtIndex = textIndex);
 			v.v = { pos[0], pos[1],pos[2] };
 			if (text.size() < 3)
 				v.vt2D = { text[0], text[1] };
@@ -98,41 +90,33 @@ void WFObjLoader::CreateMesh()
 				v.vt3D = { text[0], text[1],text[2] };
 				v.has3Dtexture = true;
 			}
-			meshVertices.push_back(std::move(v));
+			ModelRawDataVertices.push_back(std::move(v));
 		}
 
-		for (auto& vertex : meshVertices)
-		{
-			Mesh.push_back(vertex.v.x);
-			Mesh.push_back(vertex.v.y);
-			Mesh.push_back(vertex.v.z);
+		Vertex& lastVertex = ModelRawDataVertices.back();
 
-			if (vertex.has3Dtexture)
-			{
-				Mesh.push_back(vertex.vt3D.x);
-				Mesh.push_back(vertex.vt3D.y);
-				Mesh.push_back(vertex.vt3D.z);
-			}
-			else
-			{
-				Mesh.push_back(vertex.vt2D.x);
-				Mesh.push_back(vertex.vt2D.y);
-			}
-
-		}
+		if (lastVertex.has3Dtexture)
+				textureVertexLength = 3;
 
 	}
 	else if( !vPositions.empty())// make sure nothing went wrong
 	{
 		//cool we have a full vertex the size is 3
+		normVertexLength = 3;
+
 		for (auto& indices : fIndices)
 		{
 			Vertex v;
-			Positions pos =vPositions[indices.front()];
-			Textures text = vTextures[indices.at(1)];
-			Normals norm = vNormals[indices.back()];
+			const int& posIndex = indices.front();
+			const int& textIndex = indices.at(1);
+			const int& normIndex = indices.at(2);
+			Positions pos =vPositions[posIndex];
+			Textures text = vTextures[textIndex];
+			Normals norm = vNormals[normIndex];
 
-			v.index = indices.front();
+			v.index = posIndex;
+			v.vtIndex = textIndex;
+			v.vnIndex = normIndex;
 			v.v  = { pos[0], pos[1],pos[2] };
 			v.vn = { norm[0], norm[1],norm[2] };
 
@@ -143,45 +127,98 @@ void WFObjLoader::CreateMesh()
 				v.vt3D = { text[0], text[1],text[2] };
 				v.has3Dtexture = true;
 			}
-
-			meshVertices.push_back(std::move(v));
+			
+			ModelRawDataVertices.push_back(std::move(v));
 		}
 
-		for (auto& vertex : meshVertices)
+		Vertex& lastVertex = ModelRawDataVertices.back();
+
+		if (lastVertex.has3Dtexture)
+			textureVertexLength = 3;
+		else
+			textureVertexLength = 2;
+	}
+	//create crresponding indexBuffers and remove duplicates 
+	//I need to find a faster way it takes 23 minutes to create indices for a complex model
+	std::vector<Vertex> noRepeatedVerticesData;
+	unsigned int currentIndex = 0;
+	for (int i = 0; i < ModelRawDataVertices.size();++i)
+	{
+		auto& vertex = ModelRawDataVertices[i];
+		auto end = noRepeatedVerticesData.end();
+		auto beg = std::find(noRepeatedVerticesData.begin(), end, vertex);
+
+		if (beg == end)
+		{    
+			vertex.index = currentIndex;
+			noRepeatedVerticesData.push_back(vertex);
+			Indices.push_back(currentIndex);
+			++currentIndex;
+		}
+		else
 		{
-			Mesh.push_back(vertex.v.x);
-			Mesh.push_back(vertex.v.y);
-			Mesh.push_back(vertex.v.z);
-			
+			Indices.push_back(beg->index);
+		}	 
+	}
+
+	// Vertex data with no indices to use with glDrawArrays()
+	for (auto& vertex : ModelRawDataVertices)
+	{
+		ModelRawData.push_back(vertex.v.x);
+		ModelRawData.push_back(vertex.v.y);
+		ModelRawData.push_back(vertex.v.z);
+
+		if (textureVertexLength != -1)
+		{
 			if (vertex.has3Dtexture)
 			{
-				Mesh.push_back(vertex.vt3D.x);
-				Mesh.push_back(vertex.vt3D.y);
-				Mesh.push_back(vertex.vt3D.z);
+				ModelRawData.push_back(vertex.vt3D.x);
+				ModelRawData.push_back(vertex.vt3D.y);
+				ModelRawData.push_back(vertex.vt3D.z);
 			}
 			else
 			{
-				Mesh.push_back(vertex.vt2D.x);
-				Mesh.push_back(vertex.vt2D.y);
+				ModelRawData.push_back(vertex.vt2D.x);
+				ModelRawData.push_back(vertex.vt2D.y);
 			}
-			
-			Mesh.push_back(vertex.vn.x);
-			Mesh.push_back(vertex.vn.y);
-			Mesh.push_back(vertex.vn.z);
+		}
+		if (normVertexLength != -1)
+		{
+			ModelRawData.push_back(vertex.vn.x);
+			ModelRawData.push_back(vertex.vn.y);
+			ModelRawData.push_back(vertex.vn.z);
 		}
 	}
-}
-
-std::string WFObjLoader::ReadObjFile(const std::string& file)
-{
-	std::fstream f(file);
-
-	if (!f.is_open())
-		return std::string();
 	
-	std::string data{std::istreambuf_iterator<char>(f),std::istreambuf_iterator<char>()};
+	// Vertex data with  indices to use with glDrawElements()
+	for (auto& vertex : noRepeatedVerticesData)
+	{
+		IndexedModelData.push_back(vertex.v.x);
+		IndexedModelData.push_back(vertex.v.y);
+		IndexedModelData.push_back(vertex.v.z);
 
-	return data;
+		if (textureVertexLength != -1)
+		{
+			if (vertex.has3Dtexture)
+			{
+				IndexedModelData.push_back(vertex.vt3D.x);
+				IndexedModelData.push_back(vertex.vt3D.y);
+				IndexedModelData.push_back(vertex.vt3D.z);
+			}
+			else
+			{
+				IndexedModelData.push_back(vertex.vt2D.x);
+				IndexedModelData.push_back(vertex.vt2D.y);
+			}
+		}
+		if (normVertexLength != -1)
+		{
+			IndexedModelData.push_back(vertex.vn.x);
+			IndexedModelData.push_back(vertex.vn.y);
+			IndexedModelData.push_back(vertex.vn.z);
+		}
+	}
+
 }
 
 void WFObjLoader::ParseObjData(const std::string& data, std::vector<Positions>& vP, std::vector<Textures>& vT, 
@@ -221,8 +258,6 @@ void WFObjLoader::ParseObjData(const std::string& data, std::vector<Positions>& 
 		}
 	}
 }
-
-
 
 void WFObjLoader::AddVertexPositions(std::vector<Positions>& vps, std::vector<std::string>& vertexTokens)
 {
@@ -370,16 +405,19 @@ void WFObjLoader::TransformQuadFacesToTriangularFaces(std::vector<FaceIndices>& 
 	}
 }
 
-
-
 std::vector<unsigned int> WFObjLoader::GetIndices()
 {
 	return Indices;
 }
 
-std::vector<float>& WFObjLoader::GetMesh()
+std::vector<float>& WFObjLoader::GetModelDataWithNoIndices()
 {
-	return Mesh;
+	return ModelRawData;
+}
+
+std::vector<float>& WFObjLoader::GetModelDataForIndexing()
+{
+	return IndexedModelData;
 }
 
 

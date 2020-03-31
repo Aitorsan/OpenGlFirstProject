@@ -56,7 +56,7 @@ public:
     const float* getInterleavedVertices() const     { return interleavedVertices.data(); }
 
     // draw in VertexArray mode
-    void draw() const;                                  // draw surface
+    void draw(GLuint draw_type = 0x004) const;                                  // draw surface
     void drawLines(const float lineColor[4]) const;     // draw lines only
     void drawWithLines(const float lineColor[4]) const; // draw surface and lines
 

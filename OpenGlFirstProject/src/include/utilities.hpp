@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <fstream>
 
 /******************************************************************************
    Splits string into tokens with a given delimiter, and add them into a vector.
@@ -41,4 +42,17 @@ T str_to_number(std::string& str)
 		throw e;
 	}
 	return number;
+}
+
+
+inline std::string ReadObjFile(const std::string& file)
+{
+	std::fstream f(file);
+
+	if (!f.is_open())
+		return std::string();
+
+	std::string data{ std::istreambuf_iterator<char>(f),std::istreambuf_iterator<char>() };
+
+	return data;
 }
