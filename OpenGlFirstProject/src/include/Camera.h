@@ -17,6 +17,7 @@ public:
 	void MoveLeft(float elapsedTime, float velocity);
 	glm::mat4 GetCameraTranslationMatrix();
 	glm::vec3& GetCameraPosition();
+	glm::vec3 & GetCameraFront();
 	void SetCameraPosition(float x, float y, float z);
 private:
 	glm::vec3 CameraFront{};
@@ -26,4 +27,5 @@ private:
 	float pitch{};
 	float lastX{};
 	float lastY{};
+	bool init{};
 };

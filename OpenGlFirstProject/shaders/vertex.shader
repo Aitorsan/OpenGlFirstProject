@@ -18,5 +18,5 @@ void main()
 	object_position = objectPosition.xyz;
 	gl_Position = objectPosition;
 	normal_vector = mat3(transpose(inverse(model)))*NormalVector;
-	aText = atexture;
+	aText = atexture.xy;
 }

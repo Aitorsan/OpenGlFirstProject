@@ -14,29 +14,56 @@
 #include <thread>
 #include <future>
 #include <chrono>
+#include <vector>
 #include "include/Shaders.h"
 #include "include/Maths.hpp"
 #include "include/main.h"
 #include "include/Cubes.h"
 #include "include/camera.h"
-#include "include/WFObjLoader.h"
+#include "include/ModelObjParser.h"
 #include "include/utilities.hpp"
 #include "include/Diagnostics.h"
 
 GLuint DRAW_TYPE= GL_FILL;
-
 //thread stuff
 std::mutex mut;
-
 //projeciton matrix can be precomputed 
 constexpr float fov = 45.0f;
 glm::mat4 projectionMatrix = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)(SCR_HEIGHT), 0.5f, 10000.f);
 
 ////////////////// MAIN ////////////////////////////////////////////////////////////////////////
 int main()                           
-{   
+{
 	GLFWwindow* window = CreateGLFWwindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL Aitor");
-	Camera camera(0.0f,0.0f,100.0f,45.f);
+
+	/*************************************
+	* Shader programs
+	**************************************/
+	GLuint shaderProgram = CreateShaderProgram("shaders/vertex.shader", "shaders/fragment.shader");
+	GLuint lightShaderProgram = CreateShaderProgram("shaders/lightVertex.shader", "shaders/lightFragment.shader");
+	GLuint skyBoxShaderProgram = CreateShaderProgram("shaders/skyBoxVertex.shader", "shaders/skyBoxFragment.shader");
+	GLuint bugattiShaderProgram = CreateShaderProgram("shaders/bugattiVertex.shader", "shaders/bugattiFragment.shader");
+
+	Camera camera;
+	/**********************************
+	* Object loader bugatti
+	***********************************/
+	std::string data = ReadObjFile("3dModels/Bugatti.txt");
+
+	struct Mesh
+	{
+		std::vector<float>d;
+		std::vector<unsigned int> in;
+		int posSize, texSize, normSize;
+		int getVertexLenght() { return (posSize + texSize + normSize) * sizeof(float); }
+	}bugatti;
+
+	ModelObjParser f;
+	f.ParseModelData(data, ModelObjParser::GEN_INDICES);
+	f.fillIndexData(bugatti, &Mesh::in);
+	f.fillModelData(bugatti, &Mesh::d);
+	f.fillVertexSizes(bugatti.posSize, bugatti.texSize, bugatti.normSize);
+
 	//sky box
 	float skyBoxVertices[108]{};
 	genSkyBoxCube(skyBoxVertices);
@@ -49,67 +76,46 @@ int main()
 	Sphere lightSphere;
 		
 	//light position
-	glm::vec3 lightPosition(0.0f,0.0f,-0.5f);
+	glm::vec3 lightPosition(0.0f,0.1f,0.f);
 	//light color
 	glm::vec3 lightColor(0.9f, 0.9f, 0.9f);
-
-	/*************************************
-	* Shader programs
-	**************************************/
-	GLuint shaderProgram = CreateShaderProgram("shaders/vertex.shader", "shaders/fragment.shader");
-	GLuint lightShaderProgram = CreateShaderProgram("shaders/lightVertex.shader","shaders/lightFragment.shader");
-	GLuint skyBoxShaderProgram = CreateShaderProgram("shaders/skyBoxVertex.shader", "shaders/skyBoxFragment.shader");
-	GLuint modelShaderProgram = CreateShaderProgram("shaders/modelVertex.shader", "shaders/modelFragment.shader");
+	
 	/**********************************
-	* Object loader shape
+	* Prepare buffers for bugatti model
 	***********************************/
-	std::string data = ReadObjFile("3dModels/Bugatti.txt");
-	WFObjLoader f(data,WFObjLoader::GEN_INDICES);
-	auto rawModel = f.GetModelDataForIndexing();
-	auto indicesf = f.GetIndices();
+	GLuint bugattiVAO, bugattiVBO,bugattiEBO;
+	glGenVertexArrays(1, &bugattiVAO);
+	glGenBuffers(1, &bugattiVBO);
+	glGenBuffers(1, &bugattiEBO);
+	glBindVertexArray(bugattiVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, bugattiVBO);
+	glBufferData(GL_ARRAY_BUFFER, bugatti.d.size()*sizeof(float), bugatti.d.data(), GL_STATIC_DRAW);
 
-/*
-	std::ofstream mofile("model.txt");
-	if (!mofile.is_open())
-		return -1;
-
-	for (int i = 0; i < rawModel.size();++i)
-	{
-		mofile << rawModel[i];
-		if ((i+1)% 8 == 0 && i != 0)
-			mofile << std::endl;
-		else
-			mofile << " , ";
-	}
-	mofile << std::endl << "-------------\n indices\n----------------" << std::endl;
-	for (int i = 0; i < indicesf.size(); ++i)
-	{
-		mofile << indicesf[i];
-		if ((i + 1) % 8 == 0 && i != 0)
-			mofile << std::endl;
-		else
-			mofile << " , ";
-	}*/
-
-	GLuint shapeVAO, shapeVBO,shapeEBO;
-	glGenVertexArrays(1, &shapeVAO);
-	glGenBuffers(1, &shapeVBO);
-	glGenBuffers(1, &shapeEBO);
-	glBindVertexArray(shapeVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, shapeVBO);
-	glBufferData(GL_ARRAY_BUFFER, rawModel.size()*sizeof(float), rawModel.data(), GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shapeEBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesf.size() * sizeof(GLuint), indicesf.data(), GL_STATIC_DRAW);
-
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bugattiEBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, bugatti.in.size() * sizeof(GLuint),bugatti.in.data(), GL_STATIC_DRAW);
 	
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT,GL_TRUE, 8* sizeof(float), 0);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3*sizeof(float)));
-	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+	glVertexAttribPointer(0, bugatti.posSize, GL_FLOAT,GL_TRUE, bugatti.getVertexLenght(), 0);
 	
+
+	if (bugatti.texSize == 0 && bugatti.normSize != 0)
+	{
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, bugatti.normSize, GL_FLOAT, GL_FALSE, bugatti.getVertexLenght(), (void*)(bugatti.posSize *sizeof(float)));
+	
+	}
+	else if (bugatti.normSize == 0 && bugatti.texSize != 0)
+	{
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, bugatti.texSize, GL_FLOAT, GL_FALSE, bugatti.getVertexLenght(), (void*)(bugatti.posSize * sizeof(float)));
+	}
+	else if (bugatti.normSize != 0 && bugatti.texSize != 0)
+	{
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, bugatti.normSize, GL_FLOAT, GL_FALSE, bugatti.getVertexLenght(), (void*)((bugatti.posSize+ bugatti.texSize )* sizeof(float)));
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, bugatti.texSize, GL_FLOAT, GL_FALSE, bugatti.getVertexLenght(), (void*)((bugatti.posSize ) * sizeof(float)));
+	}
 	glBindVertexArray(0);
 
 	/*************************************
@@ -210,15 +216,21 @@ int main()
 	float last{0};
 	float velocity = 10.f;
 	glBindVertexArray(0);
-
+	int input_counter = 10;
 	while (!glfwWindowShouldClose(window))
 	{   
 
 		float current = glfwGetTime();
 		float elapsed = current - last;
 		last = current;
-		
-		processInput(window,camera,elapsed,velocity);
+		if (input_counter <= 0)
+		{
+			processInput(window,camera,elapsed,velocity);
+		}
+		else
+		{    
+			--input_counter;
+		}
 		glClearColor(0.5f, 0.7f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
@@ -226,6 +238,7 @@ int main()
 		glUseProgram(skyBoxShaderProgram);
 		Transforms(skyBoxShaderProgram,camera, true);
 		glm::mat4 skyModel(1.0f);
+		skyModel = glm::rotate(skyModel, glm::radians((float)glfwGetTime()/8.f), glm::vec3(0, 1, 0.f));
 		glUniformMatrix4fv(glGetUniformLocation(skyBoxShaderProgram, "model"), 1, GL_FALSE, &skyModel[0][0]);
 		glBindVertexArray(skyBoxVAO);
 		glActiveTexture(GL_TEXTURE0);
@@ -237,13 +250,13 @@ int main()
 
 		// draw light source
 		glUseProgram(lightShaderProgram);
-		glUniform3fv(glGetUniformLocation(lightShaderProgram, "ligthColor"), 1, &lightColor[0]);
 		Transforms(lightShaderProgram,camera,false);
-		glm::mat4 model(1.0f);
-		model = glm::scale(model, glm::vec3(9, 9, 9.0f));
-		model = glm::translate(model, lightPosition);
+		glm::mat4 model = glm::mat4(1.0f);
+		model  = glm::translate(model, glm::vec3(2.0f, 0.0f, cos(glfwGetTime() / 2.0f) * 16.0));
+		
+		std::cout << "\r"<<"x:" << lightPosition.x << " y:" << lightPosition.y << " z:"<<lightPosition.z;
 		glUniformMatrix4fv(glGetUniformLocation(lightShaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
-		glUniform3fv(glGetUniformLocation(lightShaderProgram, "lightColor"), 1, &lightColor[0]);
+		glUniform3fv(glGetUniformLocation(lightShaderProgram, "ligthColor"), 1, &lightColor[0]);
 		glBindVertexArray(lightVAO);
 		lightSphere.draw(DRAW_TYPE);
 
@@ -262,26 +275,19 @@ int main()
 		mut.unlock();
 		glPolygonMode(GL_FRONT_AND_BACK, DRAW_TYPE);
 		glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, currsize);
-		
-        //DRAW last stuff
-		glUseProgram(modelShaderProgram);
-		Transforms(modelShaderProgram,camera, false);
+		glBindVertexArray(0);
 
+        //DRAW bugatti model
+		glUseProgram(bugattiShaderProgram);
+		Transforms(bugattiShaderProgram,camera, false);
 		glm::mat4 modelobj = glm::mat4(1.0f);
-		auto times = (float)glfwGetTime();
-		//modelobj = glm::rotate(modelobj,glm::radians(times)*20, glm::vec3(0.f, 1.f, 0.f));
-		modelobj = glm::translate(modelobj, glm::vec3(0,30, 0));
-
-		glUniformMatrix4fv(glGetUniformLocation(modelShaderProgram, "model"), 1, GL_FALSE, &modelobj[0][0]);
-		glBindVertexArray(shapeVAO);
+		modelobj = glm::rotate(modelobj, (float)glfwGetTime(), glm::vec3(1.0, 0.0f, 0.0f));
+		modelobj = glm::scale(modelobj,glm::vec3(0.4f,0.4f,0.4f));
+		glBindVertexArray(bugattiVAO);
+		glUniformMatrix4fv(glGetUniformLocation(bugattiShaderProgram, "model"), 1, GL_FALSE, &modelobj[0][0]);
+		glUniformMatrix4fv(glGetUniformLocation(bugattiShaderProgram, "lightPosition"), 1, GL_FALSE, &lightPosition[0]);
 		glPolygonMode(GL_FRONT_AND_BACK, DRAW_TYPE);
-		//glDrawArrays(GL_TRIANGLES, 0,9);
-		//modelobj = glm::rotate(modelobj, times, glm::vec3(0.f, 2.0f, 0.f));
-		//modelobj = glm::translate(modelobj, glm::vec3(2.0f, 0.0f, cos(times/2.0f) * 6.0));
-		glUniformMatrix4fv(glGetUniformLocation(modelShaderProgram, "model"), 1, GL_FALSE, &modelobj[0][0]);
-		glPolygonMode(GL_FRONT_AND_BACK, DRAW_TYPE);
-		//glDrawArrays(GL_TRIANGLES, 0, rawModel.size());
-		glDrawElements(GL_TRIANGLES, indicesf.size(), GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, bugatti.in.size(), GL_UNSIGNED_INT, 0);
 
 
 		glfwSwapBuffers(window);
@@ -422,15 +428,6 @@ void processInput(GLFWwindow* window,Camera& camera ,float elapsedTime,float vel
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
 
-	if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)
-	{
-		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-	}
-
-	if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_RELEASE)
-	{
-		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	}
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
