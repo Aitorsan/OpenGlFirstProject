@@ -3,7 +3,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include <GLFW/glfw3.h>
 Camera::Camera()
-	: CameraPos{ 0.0f, 0.0f, 0.0f, -500.0f }
+	: CameraPos{ 0.0f, 0.0f, -5.0f }
 	, CameraFront{ 0, 0,-1.0f }
 	, CameraUp{ 0, 1, 0 }
 	, yaw{ -90 }
